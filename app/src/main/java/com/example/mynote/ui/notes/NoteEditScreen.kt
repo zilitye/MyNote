@@ -24,7 +24,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -80,7 +79,6 @@ fun NoteEditScreen(
     onCreate: (title: String, content: String, folder: String?, isFavorite: Boolean, isPinned: Boolean, isArchived: Boolean, onCreated: (Long) -> Unit) -> Unit,
     onAutosave: (id: Long, title: String, content: String, folder: String?, isFavorite: Boolean, isPinned: Boolean, isArchived: Boolean) -> Unit,
     onBack: (id: Long?, title: String, content: String, folder: String?, isFavorite: Boolean, isPinned: Boolean, isArchived: Boolean) -> Unit,
-    onDelete: (id: Long?) -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope
 ) {
@@ -93,6 +91,7 @@ fun NoteEditScreen(
     var isArchived by remember { mutableStateOf(existingNote?.isArchived ?: false) }
     var showFolderDialog by remember { mutableStateOf(false) }
     var saveState by remember { mutableStateOf(SaveState.IDLE) }
+    var isEditing by remember { mutableStateOf(existingNote == null) }
 
     // --- Undo/Redo Logic ---
     val history = remember { mutableStateListOf<HistoryItem>() }
@@ -220,25 +219,15 @@ fun NoteEditScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = ::undo, enabled = historyIndex > 0) {
-                            Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
-                        }
-                        IconButton(onClick = ::redo, enabled = historyIndex < history.size - 1) {
-                            Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
-                        }
-                        IconButton(onClick = { onBack(noteId, title, content, folder, isFavorite, isPinned, isArchived) }) {
-                            Icon(Icons.Filled.Check, contentDescription = "Save and exit")
-                        }
-                        IconButton(onClick = { isFavorite = !isFavorite }) {
-                            Icon(
-                                imageVector = if (isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                contentDescription = if (isFavorite) "Unfavorite" else "Mark as favorite",
-                                tint = if (isFavorite) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        if (noteId != null) {
-                            IconButton(onClick = { onDelete(noteId) }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete note")
+                        if (isEditing) {
+                            IconButton(onClick = ::undo, enabled = historyIndex > 0) {
+                                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                            }
+                            IconButton(onClick = ::redo, enabled = historyIndex < history.size - 1) {
+                                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                            }
+                            IconButton(onClick = { isEditing = false }) {
+                                Icon(Icons.Filled.Check, contentDescription = "Done editing")
                             }
                         }
                     }
@@ -251,31 +240,46 @@ fun NoteEditScreen(
                     .padding(innerPadding)
                     .padding(horizontal = 24.dp)
             ) {
-                BasicTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    textStyle = MaterialTheme.typography.displaySmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                    decorationBox = { innerTextField ->
-                        if (title.isEmpty()) {
-                            Text(
-                                "Title",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                            )
+                if (isEditing) {
+                    BasicTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        textStyle = MaterialTheme.typography.displaySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        decorationBox = { innerTextField ->
+                            if (title.isEmpty()) {
+                                Text(
+                                    "Title",
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                )
+                            }
+                            innerTextField()
                         }
-                        innerTextField()
-                    }
-                )
+                    )
+                } else {
+                    Text(
+                        text = title.ifBlank { "Title" },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp)
+                            .clickable { isEditing = true },
+                        style = MaterialTheme.typography.displaySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = if (title.isEmpty()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -311,21 +315,36 @@ fun NoteEditScreen(
                     }
                 }
 
-                TextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    placeholder = { Text("Start writing…") },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
-                    colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = androidx.compose.ui.graphics.Color.White,
-                        focusedContainerColor = androidx.compose.ui.graphics.Color.White,
-                        unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
-                        focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                if (isEditing) {
+                    TextField(
+                        value = content,
+                        onValueChange = { content = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        placeholder = { Text("Start writing…") },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
+                        colors = TextFieldDefaults.colors(
+                            unfocusedContainerColor = androidx.compose.ui.graphics.Color.White,
+                            focusedContainerColor = androidx.compose.ui.graphics.Color.White,
+                            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+                        )
                     )
-                )
+                } else {
+                    Text(
+                        text = content.ifBlank { "Start writing…" },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clickable { isEditing = true },
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontSize = 18.sp,
+                            color = if (content.isEmpty()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
             }
         }
     }
@@ -399,7 +418,6 @@ private fun NoteEditPreview() {
                     onCreate = { _, _, _, _, _, _, _ -> },
                     onAutosave = { _, _, _, _, _, _, _ -> },
                     onBack = { _, _, _, _, _, _, _ -> },
-                    onDelete = {},
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@AnimatedVisibility
                 )

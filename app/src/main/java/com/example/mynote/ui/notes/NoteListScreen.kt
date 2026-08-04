@@ -52,6 +52,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -77,6 +78,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -89,6 +91,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -96,6 +99,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.mynote.data.Note
@@ -187,7 +191,7 @@ fun NoteListScreen(
     val isGridView = viewMode == ViewMode.GRID
 
     val density = LocalDensity.current
-    val searchBarHeight = 72.dp
+    val searchBarHeight = 56.dp
     val searchBarHeightPx = with(density) { searchBarHeight.toPx() }
     var searchBarOffsetHeightPx by remember { mutableStateOf(0f) }
 
@@ -240,8 +244,8 @@ fun NoteListScreen(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(if (isGridView) 2 else 1),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 overscrollEffect = overscrollEffect,
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -311,24 +315,40 @@ fun NoteListScreen(
                     .background(AppBackground)
                     .padding(horizontal = 24.dp)
             ) {
-                OutlinedTextField(
+                val interactionSource = remember { MutableInteractionSource() }
+                BasicTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(searchBarHeight)
-                        .padding(vertical = 8.dp),
-                    placeholder = { Text("Search notes") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                        .padding(vertical = 6.dp),
                     singleLine = true,
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    interactionSource = interactionSource,
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    decorationBox = { innerTextField ->
+                        TextFieldDefaults.DecorationBox(
+                            value = query,
+                            innerTextField = innerTextField,
+                            enabled = true,
+                            singleLine = true,
+                            visualTransformation = VisualTransformation.None,
+                            interactionSource = interactionSource,
+                            placeholder = { Text("Search notes") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            shape = RoundedCornerShape(24.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                disabledIndicatorColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                        )
+                    }
                 )
             }
 
@@ -562,7 +582,7 @@ private fun NoteCard(
                 if (borderWidth > 0.dp) {
                     Modifier.background(
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(16.dp)
                     )
                 } else {
                     Modifier
@@ -588,11 +608,11 @@ private fun NoteCard(
                         indication = null,
                         interactionSource = interactionSource
                     ),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.Top) {
                         Text(
                             text = note.title.ifBlank { "Untitled" },
@@ -613,23 +633,12 @@ private fun NoteCard(
                         }
                         if (selectionModeActive) {
                             SelectionCheck(isSelected)
-                        } else {
-                            FavoriteStar(isFavorite = note.isFavorite, onClick = onToggleFavorite)
                         }
-                    }
-                    if (note.content.isNotBlank()) {
-                        Text(
-                            text = note.preview(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
                     }
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp),
+                            .padding(top = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -885,7 +894,7 @@ private fun SwipeToActionBox(
     }
 
     val density = LocalDensity.current
-    val actionsWidth = with(density) { (4 * 56 + 12).dp.toPx() }
+    val actionsWidth = with(density) { (4 * 40 + 3 * 8 + 12 + 12).dp.toPx() }
     val screenWidth = with(density) { androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx() }
     val decayAnimationSpec = rememberSplineBasedDecay<Float>()
 
@@ -927,7 +936,7 @@ private fun SwipeToActionBox(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(bgColor, RoundedCornerShape(20.dp)),
+                .background(bgColor, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.CenterEnd
         ) {
             if (isThresholdReached) {
@@ -987,12 +996,12 @@ private fun ActionButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(48.dp),
+        modifier = Modifier.size(40.dp),
         shape = CircleShape,
         color = color
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription, tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription, tint = Color.White, modifier = Modifier.size(20.dp))
         }
     }
 }

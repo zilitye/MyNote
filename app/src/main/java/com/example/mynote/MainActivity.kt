@@ -291,10 +291,6 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                             }
                             navController.popBackStack()
                         },
-                        onDelete = { id ->
-                            id?.let { viewModel.moveToTrash(it) }
-                            navController.popBackStack()
-                        },
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = this@composable
                     )
