@@ -1,0 +1,51 @@
+# --- Build Artifacts ---
+.gradle/
+build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aar
+*.aab
+output-metadata.json
+
+# --- Kotlin Specific ---
+.kotlin/
+.kotlin-control/
+
+# --- IDE - Android Studio / IntelliJ ---
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/caches/
+.idea/dictionaries
+.idea/libraries
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetDropDown.xml
+.idea/render.experimental.xml
+
+# --- Sensitive Information ---
+local.properties
+*.jks
+*.keystore
+secrets.properties
+
+# --- Version Control ---
+vcs.xml
+
+# --- Artifacts ---
+.artifacts/
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Gradle Wrapper ---
+!gradle-wrapper.jar
+!gradle-wrapper.properties
