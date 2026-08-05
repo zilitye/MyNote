@@ -340,6 +340,20 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                                 },
                                 onBack = label@{ id, title, content, folder, isFavorite, isPinned, isArchived, isDiscard ->
                                     if (isDiscard) {
+                                        // The editor autosaves in the background while the user types,
+                                        // so by the time "Discard" is tapped the in-progress edits may
+                                        // already be persisted. The values passed in here are the
+                                        // pre-edit ("saved") state, so write them back to undo the
+                                        // autosave. If the note was brand new (created only because
+                                        // autosave kicked in) and had nothing in it before editing
+                                        // started, remove it entirely instead of leaving an empty note.
+                                        if (id != null) {
+                                            if (title.isBlank() && content.isBlank()) {
+                                                viewModel.moveToTrash(id)
+                                            } else {
+                                                viewModel.saveNoteFields(id, title, content, folder, isFavorite, isPinned, isArchived)
+                                            }
+                                        }
                                         navController.popBackStack()
                                         return@label
                                     }

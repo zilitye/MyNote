@@ -101,6 +101,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -215,10 +216,17 @@ fun NoteListScreen(
         }
     }
 
+    // Reserve exactly as much space as the header actually renders (status bar inset +
+    // content), instead of a hardcoded guess, so the header's dim overlay and the list's
+    // dim overlay below always share the same boundary with no seam/gap between them.
+    val headerDensity = LocalDensity.current
+    var headerHeightPx by remember { mutableStateOf(0) }
+    val headerHeightDp = with(headerDensity) { headerHeightPx.toDp() }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Space for the header on top
-            Box(modifier = Modifier.statusBarsPadding().height(68.dp))
+            Box(modifier = Modifier.height(headerHeightDp))
 
             Box(
                 modifier = Modifier
@@ -417,6 +425,7 @@ fun NoteListScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .background(AppBackground)
+                .onGloballyPositioned { headerHeightPx = it.size.height }
         )
     }
 
