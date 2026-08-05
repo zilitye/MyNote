@@ -31,6 +31,8 @@ import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +47,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -84,6 +87,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,6 +115,7 @@ import com.example.mynote.ui.components.rememberElasticOverscrollEffect
 import com.example.mynote.ui.theme.AppBackground
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.mynote.util.formatDate
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 /** What subset of notes the list is currently showing, chosen from the category sheet. */
@@ -144,7 +149,10 @@ fun NoteListScreen(
     onToggleMenu: () -> Unit,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    headerDimColor: Color = Color.Transparent,
+    dimColor: Color = Color.Transparent,
+    onScrimClick: () -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf<NoteFilter>(NoteFilter.All) }
@@ -152,12 +160,6 @@ fun NoteListScreen(
     var selectionModeActive by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var selectedNoteForFolder by remember { mutableStateOf<Note?>(null) }
-
-    val dimColor by animateColorAsState(
-        targetValue = if (isMenuVisible) Color.Black.copy(alpha = 0.4f) else Color.Transparent,
-        animationSpec = tween(dimDuration),
-        label = "scrimColor"
-    )
 
     fun exitSelection() {
         selectionModeActive = false
@@ -206,7 +208,177 @@ fun NoteListScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Space for the header on top
+            Box(modifier = Modifier.statusBarsPadding().height(68.dp))
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .nestedScroll(nestedScrollConnection)
+                    .clipToBounds()
+            ) {
+                val overscrollEffect = rememberElasticOverscrollEffect()
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(if (isGridView) 2 else 1),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    overscrollEffect = overscrollEffect,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Spacer(Modifier.height(searchBarHeight))
+                    }
+
+                    if (filteredNotes.isEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            EmptyState(
+                                title = if (query.isBlank()) "No notes yet" else "No matching notes",
+                                subtitle = if (query.isBlank()) "Tap + to write your first note" else null
+                            )
+                        }
+                    } else {
+                        items(filteredNotes, key = { it.id }) { note ->
+                            SwipeToActionBox(
+                                onPin = { onTogglePin(note) },
+                                onMoveToFolder = { selectedNoteForFolder = note },
+                                onFavorite = { onToggleFavorite(note) },
+                                onDelete = { onDeleteNote(note) },
+                                enabled = !selectionModeActive && !isGridView
+                            ) {
+                                NoteCard(
+                                    note = note,
+                                    isSelected = note.id in selectedIds,
+                                    selectionModeActive = selectionModeActive,
+                                    onClick = {
+                                        if (selectionModeActive) {
+                                            selectedIds = if (note.id in selectedIds) {
+                                                selectedIds - note.id
+                                            } else {
+                                                selectedIds + note.id
+                                            }
+                                        } else {
+                                            onNoteClick(note)
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (!selectionModeActive) {
+                                            selectionModeActive = true
+                                            selectedIds = setOf(note.id)
+                                        }
+                                    },
+                                    onToggleFavorite = { onToggleFavorite(note) },
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Floating Search Bar
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !selectionModeActive,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset {
+                            IntOffset(
+                                x = 0,
+                                y = (searchBarOffsetHeightPx + overscrollEffect.overscrollOffset.value).roundToInt()
+                            )
+                        }
+                        .background(AppBackground)
+                        .padding(horizontal = 24.dp)
+                ) {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(searchBarHeight)
+                            .padding(vertical = 6.dp),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        interactionSource = interactionSource,
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        decorationBox = { innerTextField ->
+                            TextFieldDefaults.DecorationBox(
+                                value = query,
+                                innerTextField = innerTextField,
+                                enabled = true,
+                                singleLine = true,
+                                visualTransformation = VisualTransformation.None,
+                                interactionSource = interactionSource,
+                                placeholder = { Text("Search notes") },
+                                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                shape = RoundedCornerShape(24.dp),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                    disabledIndicatorColor = Color.Transparent
+                                ),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+                            )
+                        }
+                    )
+                }
+
+                // Body Scrim (Active for both menus)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(dimColor)
+                        .then(if (isMenuVisible || dimColor != Color.Transparent) Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onScrimClick() } else Modifier)
+                )
+            }
+        }
+
+        // Slide-down Category Menu (Behind Header)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isMenuVisible,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 68.dp),
+            enter = slideInVertically { -it } + expandVertically(expandFrom = Alignment.Top),
+            exit = slideOutVertically { -it } + shrinkVertically(shrinkTowards = Alignment.Top)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+                color = AppBackground,
+                tonalElevation = 3.dp
+            ) {
+                CategorySheetContent(
+                    totalCount = notes.size,
+                    favoritesCount = notes.count { it.isFavorite },
+                    trashCount = trashCount,
+                    folders = folders,
+                    selectedFilter = filter,
+                    onSelectFilter = {
+                        filter = it
+                        onToggleMenu()
+                    },
+                    onOpenTrash = {
+                        onToggleMenu()
+                        onOpenTrash()
+                    }
+                )
+            }
+        }
+
+        // Header (Always on Top)
         CustomHeader(
             title = headerTitle,
             subtitle = "${filteredNotes.size} notes",
@@ -231,165 +403,13 @@ fun NoteListScreen(
             onDeleteSelection = {
                 onDeleteNotes(selectedIds)
                 exitSelection()
-            }
-        )
-
-        Box(
+            },
+            dimColor = headerDimColor,
+            onDimClick = onScrimClick,
             modifier = Modifier
-                .weight(1f)
-                .nestedScroll(nestedScrollConnection)
-                .clipToBounds()
-        ) {
-            val overscrollEffect = rememberElasticOverscrollEffect()
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(if (isGridView) 2 else 1),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                overscrollEffect = overscrollEffect,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Spacer(Modifier.height(searchBarHeight))
-                }
-
-                if (filteredNotes.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        EmptyState(
-                            title = if (query.isBlank()) "No notes yet" else "No matching notes",
-                            subtitle = if (query.isBlank()) "Tap + to write your first note" else null
-                        )
-                    }
-                } else {
-                    items(filteredNotes, key = { it.id }) { note ->
-                        SwipeToActionBox(
-                            onPin = { onTogglePin(note) },
-                            onMoveToFolder = { selectedNoteForFolder = note },
-                            onFavorite = { onToggleFavorite(note) },
-                            onDelete = { onDeleteNote(note) },
-                            enabled = !selectionModeActive && !isGridView
-                        ) {
-                            NoteCard(
-                                note = note,
-                                isSelected = note.id in selectedIds,
-                                selectionModeActive = selectionModeActive,
-                                onClick = {
-                                    if (selectionModeActive) {
-                                        selectedIds = if (note.id in selectedIds) {
-                                            selectedIds - note.id
-                                        } else {
-                                            selectedIds + note.id
-                                        }
-                                    } else {
-                                        onNoteClick(note)
-                                    }
-                                },
-                                onLongClick = {
-                                    if (!selectionModeActive) {
-                                        selectionModeActive = true
-                                        selectedIds = setOf(note.id)
-                                    }
-                                },
-                                onToggleFavorite = { onToggleFavorite(note) },
-                                sharedTransitionScope = sharedTransitionScope,
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Floating Search Bar
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !selectionModeActive,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset {
-                        IntOffset(
-                            x = 0,
-                            y = (searchBarOffsetHeightPx + overscrollEffect.overscrollOffset.value).roundToInt()
-                        )
-                    }
-                    .background(AppBackground)
-                    .padding(horizontal = 24.dp)
-            ) {
-                val interactionSource = remember { MutableInteractionSource() }
-                BasicTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(searchBarHeight)
-                        .padding(vertical = 6.dp),
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    interactionSource = interactionSource,
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                    decorationBox = { innerTextField ->
-                        TextFieldDefaults.DecorationBox(
-                            value = query,
-                            innerTextField = innerTextField,
-                            enabled = true,
-                            singleLine = true,
-                            visualTransformation = VisualTransformation.None,
-                            interactionSource = interactionSource,
-                            placeholder = { Text("Search notes") },
-                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                                disabledIndicatorColor = Color.Transparent
-                            ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
-                        )
-                    }
-                )
-            }
-
-            // Scrim
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(dimColor)
-                    .then(if (isMenuVisible) Modifier.clickable { onToggleMenu() } else Modifier)
-            )
-
-            // Slide-down Menu
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isMenuVisible,
-                enter = slideInVertically { -it } + expandVertically(expandFrom = Alignment.Top),
-                exit = slideOutVertically { -it } + shrinkVertically(shrinkTowards = Alignment.Top)
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
-                    color = AppBackground,
-                    tonalElevation = 3.dp
-                ) {
-                    CategorySheetContent(
-                        totalCount = notes.size,
-                        favoritesCount = notes.count { it.isFavorite },
-                        trashCount = trashCount,
-                        folders = folders,
-                        selectedFilter = filter,
-                        onSelectFilter = {
-                            filter = it
-                            onToggleMenu()
-                        },
-                        onOpenTrash = {
-                            onToggleMenu()
-                            onOpenTrash()
-                        }
-                    )
-                }
-            }
-        }
+                .align(Alignment.TopCenter)
+                .background(AppBackground)
+        )
     }
 
 
@@ -408,7 +428,7 @@ fun NoteListScreen(
         FolderPickerDialog(
             current = selectedNoteForFolder?.folder,
             folders = folders,
-            onSelect = { folder ->
+            onSelect = { folder: String? ->
                 selectedNoteForFolder?.let { onMoveToFolder(it, folder) }
                 selectedNoteForFolder = null
             },
@@ -644,9 +664,18 @@ private fun NoteCard(
                         Text(
                             text = formatDate(note.updatedAt),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.weight(1f)
+                            color = MaterialTheme.colorScheme.outline
                         )
+                        if (note.isFavorite) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "Favorite",
+                                tint = Color(0xFFFFC107),
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                         if (!note.folder.isNullOrBlank()) {
                             Icon(
                                 Icons.Filled.Folder,
@@ -897,6 +926,7 @@ private fun SwipeToActionBox(
     val actionsWidth = with(density) { (4 * 40 + 3 * 8 + 12 + 12).dp.toPx() }
     val screenWidth = with(density) { androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx() }
     val decayAnimationSpec = rememberSplineBasedDecay<Float>()
+    val scope = rememberCoroutineScope()
 
     val state = remember {
         AnchoredDraggableState(
@@ -965,13 +995,27 @@ private fun SwipeToActionBox(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ActionButton(pinColor, Icons.Filled.VerticalAlignTop, "Pin", onPin)
+                ActionButton(pinColor, Icons.Filled.VerticalAlignTop, "Pin") {
+                    onPin()
+                    scope.launch { state.animateTo(DragValue.Start) }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                ActionButton(archiveColor, Icons.Filled.Folder, "Move to Folder", onMoveToFolder)
+                ActionButton(archiveColor, Icons.Filled.Folder, "Move to Folder") {
+                    onMoveToFolder()
+                    scope.launch { state.animateTo(DragValue.Start) }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                ActionButton(favoriteColor, Icons.Filled.Star, "Favorite", onFavorite)
+                ActionButton(favoriteColor, Icons.Filled.Star, "Favorite") {
+                    onFavorite()
+                    scope.launch { state.animateTo(DragValue.Start) }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
-                ActionButton(deleteColor, Icons.Filled.Delete, "Delete", onDelete)
+                ActionButton(deleteColor, Icons.Filled.Delete, "Delete") {
+                    onDelete()
+                    // If deleted, the item will likely be removed from the list, 
+                    // but we animate back anyway for consistency in case it stays.
+                    scope.launch { state.animateTo(DragValue.Start) }
+                }
             }
         }
 
@@ -1005,3 +1049,4 @@ private fun ActionButton(
         }
     }
 }
+

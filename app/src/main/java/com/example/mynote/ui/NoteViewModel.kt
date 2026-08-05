@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class NoteViewModel(
@@ -98,6 +99,17 @@ class NoteViewModel(
         isArchived: Boolean
     ) {
         viewModelScope.launch {
+            val existing = rawNotes.first().find { it.id == id }
+            if (existing != null) {
+                val unchanged = existing.title == title &&
+                    existing.content == content &&
+                    existing.folder == folder &&
+                    existing.isFavorite == isFavorite &&
+                    existing.isPinned == isPinned &&
+                    existing.isArchived == isArchived
+                if (unchanged) return@launch
+            }
+
             dao.updateNoteFields(
                 id,
                 title,

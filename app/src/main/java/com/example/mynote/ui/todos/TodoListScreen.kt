@@ -1,5 +1,3 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-
 package com.example.mynote.ui.todos
 
 import androidx.compose.animation.AnimatedVisibility
@@ -26,7 +24,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -83,9 +83,6 @@ sealed class TodoFilter {
     data class Folder(val name: String) : TodoFilter()
 }
 
-private val dimDuration = 300
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoListScreen(
     todos: List<Todo>,
@@ -99,18 +96,16 @@ fun TodoListScreen(
     onOpenSettings: () -> Unit,
     isMenuVisible: Boolean,
     onToggleMenu: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInputVisibilityChange: (Boolean) -> Unit = {},
+    headerDimColor: Color = Color.Transparent,
+    dimColor: Color = Color.Transparent,
+    onEditTodo: (Todo) -> Unit = {},
+    onScrimClick: () -> Unit = {}
 ) {
     var hideCompleted by remember { mutableStateOf(false) }
     var showDeleteCompletedConfirm by remember { mutableStateOf(false) }
     var filter by remember { mutableStateOf<TodoFilter>(TodoFilter.All) }
-    var editingTodo by remember { mutableStateOf<Todo?>(null) }
-
-    val dimColor by animateColorAsState(
-        targetValue = if (isMenuVisible) Color.Black.copy(alpha = 0.4f) else Color.Transparent,
-        animationSpec = tween(dimDuration),
-        label = "todoScrimColor"
-    )
 
     val folders = remember(todos) {
         todos.mapNotNull { it.folder?.trim()?.takeIf { name -> name.isNotBlank() } }
@@ -135,7 +130,109 @@ fun TodoListScreen(
         is TodoFilter.Folder -> f.name
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Space for the header on top
+            Box(modifier = Modifier.statusBarsPadding().height(68.dp))
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (todos.isEmpty()) {
+                    Text(
+                        text = "Nothing to do yet. Tap + to add one.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                } else if (scopedTodos.isEmpty()) {
+                    Text(
+                        text = "No to-dos in this category.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        overscrollEffect = rememberElasticOverscrollEffect(),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(pending, key = { it.id }) { todo ->
+                            TodoItemWithDismiss(
+                                todo,
+                                onToggleDone,
+                                onDeleteTodo,
+                                onEdit = { onEditTodo(it) },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+
+                        if (!hideCompleted && completed.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Completed",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                                )
+                            }
+                            items(completed, key = { it.id }) { todo ->
+                                TodoItemWithDismiss(
+                                    todo,
+                                    onToggleDone,
+                                    onDeleteTodo,
+                                    onEdit = { onEditTodo(it) },
+                                    modifier = Modifier.animateItem()
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Body Scrim (Active for both menus)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(dimColor)
+                        .then(if (isMenuVisible || dimColor != Color.Transparent) Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onScrimClick() } else Modifier)
+                )
+            }
+        }
+
+        // Slide-down Category Menu (Behind Header)
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isMenuVisible,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 68.dp),
+            enter = slideInVertically { -it } + expandVertically(expandFrom = Alignment.Top),
+            exit = slideOutVertically { -it } + shrinkVertically(shrinkTowards = Alignment.Top)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
+                color = AppBackground,
+                tonalElevation = 3.dp
+            ) {
+                TodoCategorySheetContent(
+                    totalCount = todos.size,
+                    importantCount = todos.count { it.isImportant && !it.isDone },
+                    folders = folders,
+                    selectedFilter = filter,
+                    onSelectFilter = {
+                        filter = it
+                        onToggleMenu()
+                    }
+                )
+            }
+        }
+
+        // Header (Always on Top)
         CustomHeader(
             title = headerTitle,
             subtitle = "${pending.size} pending" + if (completed.isNotEmpty()) " · ${completed.size} done" else "",
@@ -152,111 +249,12 @@ fun TodoListScreen(
                     "Batch Delete" -> showDeleteCompletedConfirm = true
                     "Settings" -> onOpenSettings()
                 }
-            }
-        )
-
-        Box(modifier = Modifier.weight(1f)) {
-            if (todos.isEmpty()) {
-                Text(
-                    text = "Nothing to do yet. Tap + to add one.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
-            } else if (scopedTodos.isEmpty()) {
-                Text(
-                    text = "No to-dos in this category.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = 24.dp)
-                )
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    overscrollEffect = rememberElasticOverscrollEffect(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(pending, key = { it.id }) { todo ->
-                        TodoItemWithDismiss(
-                            todo,
-                            onToggleDone,
-                            onDeleteTodo,
-                            onEdit = { editingTodo = it },
-                            modifier = Modifier.animateItem()
-                        )
-                    }
-
-                    if (!hideCompleted && completed.isNotEmpty()) {
-                        item {
-                            Text(
-                                text = "Completed",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-                            )
-                        }
-                        items(completed, key = { it.id }) { todo ->
-                            TodoItemWithDismiss(
-                                todo,
-                                onToggleDone,
-                                onDeleteTodo,
-                                onEdit = { editingTodo = it },
-                                modifier = Modifier.animateItem()
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Scrim
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(dimColor)
-                    .then(if (isMenuVisible) Modifier.clickable { onToggleMenu() } else Modifier)
-            )
-
-            // Slide-down Menu
-            androidx.compose.animation.AnimatedVisibility(
-                visible = isMenuVisible,
-                enter = slideInVertically { -it } + expandVertically(expandFrom = Alignment.Top),
-                exit = slideOutVertically { -it } + shrinkVertically(shrinkTowards = Alignment.Top)
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
-                    color = AppBackground,
-                    tonalElevation = 3.dp
-                ) {
-                    TodoCategorySheetContent(
-                        totalCount = todos.size,
-                        importantCount = todos.count { it.isImportant && !it.isDone },
-                        folders = folders,
-                        selectedFilter = filter,
-                        onSelectFilter = {
-                            filter = it
-                            onToggleMenu()
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    if (showAddDialog) {
-        AddTodoDialog(onAdd = onAddTodo, onDismiss = onDismissAddDialog)
-    }
-
-    editingTodo?.let { todo ->
-        EditTodoDialog(
-            todo = todo,
-            onUpdate = { updatedTodo ->
-                onUpdateTodo(updatedTodo)
-                editingTodo = null
             },
-            onDismiss = { editingTodo = null }
+            dimColor = headerDimColor,
+            onDimClick = onScrimClick,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .background(AppBackground)
         )
     }
 
@@ -495,23 +493,26 @@ private fun TodoRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddTodoDialog(
-    onAdd: (title: String, important: Boolean, dueAt: Long?) -> Unit,
-    onDismiss: () -> Unit
+fun TodoInputContent(
+    title: String,
+    onTitleChange: (String) -> Unit,
+    isImportant: Boolean,
+    onImportantChange: (Boolean) -> Unit,
+    dueAt: Long?,
+    onDueAtChange: (Long?) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    isEdit: Boolean
 ) {
-    var title by remember { mutableStateOf("") }
-    var important by remember { mutableStateOf(false) }
-    var dueAt by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
-
-    val datePickerState = rememberDatePickerState()
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dueAt)
 
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    dueAt = datePickerState.selectedDateMillis
+                    onDueAtChange(datePickerState.selectedDateMillis)
                     showDatePicker = false
                 }) { Text("OK") }
             },
@@ -523,132 +524,74 @@ private fun AddTodoDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New to-do") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = { Text("What needs to be done?") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 12.dp)
-                ) {
-                    Text("Mark as important", modifier = Modifier.weight(1f))
-                    Switch(checked = important, onCheckedChange = { important = it })
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 12.dp)
-                ) {
-                    Text(
-                        text = if (dueAt != null) "Due: ${formatDateTime(dueAt!!)}" else "No due date",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Filled.CalendarToday, contentDescription = "Pick Date")
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = title.isNotBlank(),
-                onClick = {
-                    onAdd(title.trim(), important, dueAt)
-                    onDismiss()
-                }
-            ) { Text("Add") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditTodoDialog(
-    todo: Todo,
-    onUpdate: (Todo) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var title by remember { mutableStateOf(todo.title) }
-    var important by remember { mutableStateOf(todo.isImportant) }
-    var dueAt by remember { mutableStateOf(todo.dueAt) }
-    var showDatePicker by remember { mutableStateOf(false) }
-
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = todo.dueAt)
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    dueAt = datePickerState.selectedDateMillis
-                    showDatePicker = false
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
-            }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 0.dp)
+            .navigationBarsPadding()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            DatePicker(state = datePickerState)
-        }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit to-do") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = { Text("What needs to be done?") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 12.dp)
-                ) {
-                    Text("Mark as important", modifier = Modifier.weight(1f))
-                    Switch(checked = important, onCheckedChange = { important = it })
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 12.dp)
-                ) {
-                    Text(
-                        text = if (dueAt != null) "Due: ${formatDateTime(dueAt!!)}" else "No due date",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Filled.CalendarToday, contentDescription = "Pick Date")
-                    }
-                }
+            Text(
+                text = if (isEdit) "Edit to-do" else "New to-do",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Filled.Close, contentDescription = "Close")
             }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = title.isNotBlank(),
-                onClick = {
-                    onUpdate(todo.copy(title = title.trim(), isImportant = important, dueAt = dueAt))
-                }
-            ) { Text("Save") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = onTitleChange,
+            placeholder = { Text("What needs to be done?") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            Text("Mark as important", modifier = Modifier.weight(1f))
+            Switch(checked = isImportant, onCheckedChange = onImportantChange)
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            Text(
+                text = if (dueAt != null) "Due: ${formatDateTime(dueAt)}" else "No due date",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            IconButton(onClick = { showDatePicker = true }) {
+                Icon(Icons.Filled.CalendarToday, contentDescription = "Pick Date")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        androidx.compose.material3.Button(
+            onClick = onConfirm,
+            enabled = title.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Text(if (isEdit) "Save" else "Add")
+        }
+        
+        // Add some bottom padding for edge-to-edge
+        Spacer(modifier = Modifier.height(24.dp))
+    }
 }
 
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
@@ -677,11 +620,18 @@ private fun TodoListScreenPreview() {
 
 @androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
-private fun AddTodoDialogPreview() {
+private fun TodoInputContentPreview() {
     MaterialTheme {
-        AddTodoDialog(
-            onAdd = { _, _, _ -> },
-            onDismiss = {}
+        TodoInputContent(
+            title = "Sample To-do",
+            onTitleChange = {},
+            isImportant = true,
+            onImportantChange = {},
+            dueAt = System.currentTimeMillis(),
+            onDueAtChange = {},
+            onConfirm = {},
+            onDismiss = {},
+            isEdit = false
         )
     }
 }
