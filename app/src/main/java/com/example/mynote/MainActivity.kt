@@ -124,6 +124,7 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
     var inputTitle by remember { mutableStateOf("") }
     var inputIsImportant by remember { mutableStateOf(false) }
     var inputDueAt by remember { mutableStateOf<Long?>(null) }
+    var inputFolder by remember { mutableStateOf<String?>(null) }
 
     var isCategoryMenuVisible by remember { mutableStateOf(false) }
 
@@ -134,11 +135,13 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
             inputTitle = ""
             inputIsImportant = false
             inputDueAt = null
+            inputFolder = null
             wasEditingBeforeDismiss = false
         } else if (editingTodo != null) {
             inputTitle = editingTodo?.title ?: ""
             inputIsImportant = editingTodo?.isImportant ?: false
             inputDueAt = editingTodo?.dueAt
+            inputFolder = editingTodo?.folder
             wasEditingBeforeDismiss = true
         }
     }
@@ -286,6 +289,7 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                             enterTransition = { fadeIn(tween(slideDurationMs)) },
                             exitTransition = { fadeOut(tween(slideDurationMs)) }
                         ) {
+                            val todoFolders by viewModel.todoFolders.collectAsState()
                             TodoListScreen(
                                 todos = todos,
                                 onToggleDone = { todo ->
@@ -298,12 +302,13 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                                     viewModel.deleteTodo(todo.id)
                                 },
                                 onDeleteCompleted = { viewModel.deleteCompletedTodos() },
-                                onAddTodo = { title, important, dueAt ->
-                                    viewModel.addTodo(title, important, dueAt)
+                                onAddTodo = { title, important, dueAt, folder ->
+                                    viewModel.addTodo(title, important, dueAt, folder)
                                 },
                                 showAddDialog = showAddTodoDialog,
                                 onDismissAddDialog = { showAddTodoDialog = false },
                                 trashCount = trashedTodos.size,
+                                folders = todoFolders,
                                 onOpenTrash = { navController.navigate(Screen.TodoTrash.route) },
                                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                                 isMenuVisible = isCategoryMenuVisible,
@@ -465,15 +470,19 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                     onImportantChange = { inputIsImportant = it },
                     dueAt = inputDueAt,
                     onDueAtChange = { inputDueAt = it },
+                    folder = inputFolder,
+                    onFolderChange = { inputFolder = it },
+                    folders = viewModel.todoFolders.collectAsState().value,
                     onConfirm = {
                         if (showAddTodoDialog) {
-                            viewModel.addTodo(inputTitle.trim(), inputIsImportant, inputDueAt)
+                            viewModel.addTodo(inputTitle.trim(), inputIsImportant, inputDueAt, inputFolder)
                             showAddTodoDialog = false
                         } else if (editingTodo != null) {
                             viewModel.updateTodo(editingTodo!!.copy(
                                 title = inputTitle.trim(),
                                 isImportant = inputIsImportant,
-                                dueAt = inputDueAt
+                                dueAt = inputDueAt,
+                                folder = inputFolder
                             ))
                             editingTodo = null
                         }

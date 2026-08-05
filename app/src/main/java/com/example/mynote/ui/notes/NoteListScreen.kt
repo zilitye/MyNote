@@ -108,6 +108,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.mynote.data.Note
+import com.example.mynote.ui.components.FolderPickerDialog
 import com.example.mynote.data.SortOrder
 import com.example.mynote.data.ViewMode
 import com.example.mynote.ui.components.CircularCheckbox
@@ -160,6 +161,7 @@ fun NoteListScreen(
     var selectionModeActive by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var selectedNoteForFolder by remember { mutableStateOf<Note?>(null) }
+    var swipedNoteId by remember { mutableStateOf<Long?>(null) }
 
     fun exitSelection() {
         selectionModeActive = false
@@ -221,6 +223,12 @@ fun NoteListScreen(
     var headerHeightPx by remember { mutableStateOf(0) }
     val headerHeightDp = with(headerDensity) { headerHeightPx.toDp() }
 
+    androidx.compose.runtime.LaunchedEffect(gridState.isScrollInProgress) {
+        if (gridState.isScrollInProgress) {
+            swipedNoteId = null
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Space for the header on top
@@ -256,6 +264,9 @@ fun NoteListScreen(
                     } else {
                         items(filteredNotes, key = { it.id }) { note ->
                             SwipeToActionBox(
+                                isOpened = swipedNoteId == note.id,
+                                onOpened = { swipedNoteId = note.id },
+                                onClosed = { if (swipedNoteId == note.id) swipedNoteId = null },
                                 onPin = { onTogglePin(note) },
                                 onMoveToFolder = { selectedNoteForFolder = note },
                                 onFavorite = { onToggleFavorite(note) },
@@ -926,6 +937,9 @@ private val deleteColor = Color(0xFFF44336)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SwipeToActionBox(
+    isOpened: Boolean,
+    onOpened: () -> Unit,
+    onClosed: () -> Unit,
     onPin: () -> Unit,
     onMoveToFolder: () -> Unit,
     onFavorite: () -> Unit,
@@ -963,6 +977,20 @@ private fun SwipeToActionBox(
                 true
             }
         )
+    }
+
+    androidx.compose.runtime.LaunchedEffect(isOpened) {
+        if (!isOpened && state.currentValue != DragValue.Start) {
+            state.animateTo(DragValue.Start)
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(state.targetValue) {
+        if (state.targetValue != DragValue.Start) {
+            onOpened()
+        } else {
+            onClosed()
+        }
     }
 
     Box(

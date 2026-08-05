@@ -52,17 +52,23 @@ class NoteViewModel(
     val trashedNotes: StateFlow<List<Note>> = dao.getTrashedNotesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allTodos: StateFlow<List<Todo>> = dao.getAllTodosFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trashedTodos: StateFlow<List<Todo>> = dao.getTrashedTodosFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val folders: StateFlow<List<String>> = rawNotes.map { list ->
         list.mapNotNull { note -> note.folder?.trim()?.takeIf { it.isNotBlank() } }
             .distinct()
             .sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val allTodos: StateFlow<List<Todo>> = dao.getAllTodosFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val trashedTodos: StateFlow<List<Todo>> = dao.getTrashedTodosFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val todoFolders: StateFlow<List<String>> = allTodos.map { list ->
+        list.mapNotNull { todo -> todo.folder?.trim()?.takeIf { it.isNotBlank() } }
+            .distinct()
+            .sorted()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ---- Notes ----
 
@@ -224,29 +230,34 @@ class NoteViewModel(
     // ---- Settings ----
 
     fun setSortOrder(order: SortOrder) {
-        _sortOrder.value = order
-        settings.sortOrder = order
+        viewModelScope.launch {
+            _sortOrder.value = order
+            settings.sortOrder = order
+        }
     }
 
     fun setViewMode(mode: ViewMode) {
-        _viewMode.value = mode
-        settings.viewMode = mode
+        viewModelScope.launch {
+            _viewMode.value = mode
+            settings.viewMode = mode
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
-        _themeMode.value = mode
-        settings.themeMode = mode
+        viewModelScope.launch {
+            _themeMode.value = mode
+            settings.themeMode = mode
+        }
     }
 }
 
 class NoteViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(NoteViewModel::class.java)) {
+            val database = AppDatabase.getDatabase(context)
+            val settings = SettingsRepository(context)
             @Suppress("UNCHECKED_CAST")
-            return NoteViewModel(
-                AppDatabase.getDatabase(context),
-                SettingsRepository(context)
-            ) as T
+            return NoteViewModel(database, settings) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

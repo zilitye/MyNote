@@ -59,6 +59,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mynote.data.Note
+import com.example.mynote.ui.components.FolderPickerDialog
 import com.example.mynote.util.formatDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -433,55 +434,6 @@ fun NoteEditScreen(
             }
         }
     }
-}
-
-@Composable
-fun FolderPickerDialog(
-    current: String?,
-    folders: List<String>,
-    onSelect: (String?) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var custom by remember { mutableStateOf(current?.takeIf { it !in folders } ?: "") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Move to folder") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = custom,
-                    onValueChange = { custom = it },
-                    placeholder = { Text("New folder name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (folders.isNotEmpty()) {
-                    Row(modifier = Modifier.padding(top = 12.dp)) {
-                        Text(
-                            "Existing folders",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                    folders.forEach { name ->
-                        TextButton(onClick = { onSelect(name) }, modifier = Modifier.fillMaxWidth()) {
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                Text(name, modifier = Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSelect(custom.trim().takeIf { it.isNotBlank() }) }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = { onSelect(null) }) { Text("No folder") }
-        }
-    )
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
@@ -73,6 +74,7 @@ import com.example.mynote.data.Todo
 import com.example.mynote.ui.components.CircularCheckbox
 import com.example.mynote.ui.components.CustomHeader
 import com.example.mynote.ui.components.rememberElasticOverscrollEffect
+import com.example.mynote.ui.components.FolderPickerDialog
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.mynote.util.formatDateTime
 
@@ -90,10 +92,11 @@ fun TodoListScreen(
     onUpdateTodo: (Todo) -> Unit,
     onDeleteTodo: (Todo) -> Unit,
     onDeleteCompleted: () -> Unit,
-    onAddTodo: (title: String, important: Boolean, dueAt: Long?) -> Unit,
+    onAddTodo: (title: String, important: Boolean, dueAt: Long?, folder: String?) -> Unit,
     showAddDialog: Boolean,
     onDismissAddDialog: () -> Unit,
     trashCount: Int,
+    folders: List<String>,
     onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
     isMenuVisible: Boolean,
@@ -108,6 +111,8 @@ fun TodoListScreen(
     var hideCompleted by remember { mutableStateOf(false) }
     var showDeleteCompletedConfirm by remember { mutableStateOf(false) }
     var filter by remember { mutableStateOf<TodoFilter>(TodoFilter.All) }
+    var movingTodoToFolder by remember { mutableStateOf<Todo?>(null) }
+    var swipedTodoId by remember { mutableStateOf<Long?>(null) }
 
     val folders = remember(todos) {
         todos.mapNotNull { it.folder?.trim()?.takeIf { name -> name.isNotBlank() } }
@@ -139,6 +144,13 @@ fun TodoListScreen(
     var headerHeightPx by remember { mutableStateOf(0) }
     val headerHeightDp = with(density) { headerHeightPx.toDp() }
 
+    val listState = rememberLazyListState()
+    androidx.compose.runtime.LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            swipedTodoId = null
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Space for the header on top
@@ -161,17 +173,22 @@ fun TodoListScreen(
                     )
                 } else {
                     LazyColumn(
+                        state = listState,
                         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         overscrollEffect = rememberElasticOverscrollEffect(),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         items(pending, key = { it.id }) { todo ->
-                            TodoItemWithDismiss(
-                                todo,
-                                onToggleDone,
-                                onDeleteTodo,
-                                onEdit = { onEditTodo(it) },
+                            SwipeableTodoItem(
+                                todo = todo,
+                                isOpened = swipedTodoId == todo.id,
+                                onOpened = { swipedTodoId = todo.id },
+                                onClosed = { if (swipedTodoId == todo.id) swipedTodoId = null },
+                                onToggleDone = onToggleDone,
+                                onDelete = onDeleteTodo,
+                                onMoveToFolder = { movingTodoToFolder = it },
+                                onEdit = onEditTodo,
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -187,11 +204,15 @@ fun TodoListScreen(
                                 )
                             }
                             items(completed, key = { it.id }) { todo ->
-                                TodoItemWithDismiss(
-                                    todo,
-                                    onToggleDone,
-                                    onDeleteTodo,
-                                    onEdit = { onEditTodo(it) },
+                                SwipeableTodoItem(
+                                    todo = todo,
+                                    isOpened = swipedTodoId == todo.id,
+                                    onOpened = { swipedTodoId = todo.id },
+                                    onClosed = { if (swipedTodoId == todo.id) swipedTodoId = null },
+                                    onToggleDone = onToggleDone,
+                                    onDelete = onDeleteTodo,
+                                    onMoveToFolder = { movingTodoToFolder = it },
+                                    onEdit = onEditTodo,
                                     modifier = Modifier.animateItem()
                                 )
                             }
@@ -288,6 +309,20 @@ fun TodoListScreen(
             dismissButton = {
                 TextButton(onClick = { showDeleteCompletedConfirm = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    if (movingTodoToFolder != null) {
+        FolderPickerDialog(
+            current = movingTodoToFolder?.folder,
+            folders = folders,
+            onSelect = { folder ->
+                movingTodoToFolder?.let {
+                    onUpdateTodo(it.copy(folder = folder))
+                }
+                movingTodoToFolder = null
+            },
+            onDismiss = { movingTodoToFolder = null }
         )
     }
 }
@@ -392,55 +427,9 @@ private fun TodoCategoryItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TodoItemWithDismiss(
-    todo: Todo,
-    onToggleDone: (Todo) -> Unit,
-    onDelete: (Todo) -> Unit,
-    onEdit: (Todo) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            if (it == SwipeToDismissBoxValue.EndToStart) {
-                onDelete(todo)
-                true
-            } else false
-        }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        modifier = modifier,
-        backgroundContent = {
-            val color = when (dismissState.dismissDirection) {
-                SwipeToDismissBoxValue.EndToStart -> Color.Red.copy(alpha = 0.5f)
-                else -> Color.Transparent
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 4.dp)
-                    .background(color, RoundedCornerShape(20.dp)),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = "Delete",
-                    tint = Color.White,
-                    modifier = Modifier.padding(end = 16.dp)
-                )
-            }
-        },
-        enableDismissFromStartToEnd = false
-    ) {
-        TodoRow(todo = todo, onToggleDone = onToggleDone, onEdit = onEdit)
-    }
-}
 
 @Composable
-private fun TodoRow(
+fun TodoRow(
     todo: Todo,
     onToggleDone: (Todo) -> Unit,
     onEdit: (Todo) -> Unit
@@ -524,11 +513,15 @@ fun TodoInputContent(
     onImportantChange: (Boolean) -> Unit,
     dueAt: Long?,
     onDueAtChange: (Long?) -> Unit,
+    folder: String?,
+    onFolderChange: (String?) -> Unit,
+    folders: List<String>,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     isEdit: Boolean
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
+    var showFolderPicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = dueAt)
 
     if (showDatePicker) {
@@ -546,6 +539,18 @@ fun TodoInputContent(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showFolderPicker) {
+        FolderPickerDialog(
+            current = folder,
+            folders = folders,
+            onSelect = {
+                onFolderChange(it)
+                showFolderPicker = false
+            },
+            onDismiss = { showFolderPicker = false }
+        )
     }
 
     Column(
@@ -602,6 +607,20 @@ fun TodoInputContent(
             }
         }
 
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 12.dp)
+        ) {
+            Text(
+                text = folder?.takeIf { it.isNotBlank() } ?: "No folder",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            IconButton(onClick = { showFolderPicker = true }) {
+                Icon(Icons.Filled.Folder, contentDescription = "Pick Folder")
+            }
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         androidx.compose.material3.Button(
@@ -632,10 +651,11 @@ private fun TodoListScreenPreview() {
             onUpdateTodo = {},
             onDeleteTodo = {},
             onDeleteCompleted = {},
-            onAddTodo = { _, _, _ -> },
+            onAddTodo = { _, _, _, _ -> },
             showAddDialog = false,
             onDismissAddDialog = {},
             trashCount = 2,
+            folders = listOf("Work", "Personal"),
             onOpenTrash = {},
             onOpenSettings = {},
             isMenuVisible = false,
@@ -655,6 +675,9 @@ private fun TodoInputContentPreview() {
             onImportantChange = {},
             dueAt = System.currentTimeMillis(),
             onDueAtChange = {},
+            folder = "Work",
+            onFolderChange = {},
+            folders = listOf("Work", "Personal"),
             onConfirm = {},
             onDismiss = {},
             isEdit = false
