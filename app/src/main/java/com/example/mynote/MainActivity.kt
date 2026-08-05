@@ -69,6 +69,7 @@ import com.example.mynote.ui.settings.SettingsScreen
 import com.example.mynote.ui.theme.MyNoteTheme
 import com.example.mynote.ui.todos.TodoInputContent
 import com.example.mynote.ui.todos.TodoListScreen
+import com.example.mynote.ui.todos.TodoTrashScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +91,7 @@ sealed class Screen(val route: String) {
     data object NoteList : Screen("noteList")
     data object TodoList : Screen("todoList")
     data object Trash : Screen("trash")
+    data object TodoTrash : Screen("todoTrash")
     data object Settings : Screen("settings")
     data object NoteEditor : Screen("noteEditor?noteId={noteId}") {
         fun createRoute(noteId: Long?) = "noteEditor?noteId=${noteId ?: -1L}"
@@ -109,6 +111,7 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
     val notes by viewModel.allNotes.collectAsState()
     val trashedNotes by viewModel.trashedNotes.collectAsState()
     val todos by viewModel.allTodos.collectAsState()
+    val trashedTodos by viewModel.trashedTodos.collectAsState()
     val folders by viewModel.folders.collectAsState()
     val viewMode by viewModel.viewMode.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
@@ -300,6 +303,8 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                                 },
                                 showAddDialog = showAddTodoDialog,
                                 onDismissAddDialog = { showAddTodoDialog = false },
+                                trashCount = trashedTodos.size,
+                                onOpenTrash = { navController.navigate(Screen.TodoTrash.route) },
                                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                                 isMenuVisible = isCategoryMenuVisible,
                                 onToggleMenu = { isCategoryMenuVisible = !isCategoryMenuVisible },
@@ -394,6 +399,24 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
                                 onRestore = { note -> viewModel.restoreNote(note.id) },
                                 onDeleteForever = { note -> viewModel.deleteForever(note.id) },
                                 onEmptyTrash = { viewModel.emptyTrash() },
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
+                        composable(
+                            Screen.TodoTrash.route,
+                            enterTransition = {
+                                slideInHorizontally(tween(slideDurationMs)) { it } + fadeIn(tween(slideDurationMs))
+                            },
+                            exitTransition = { fadeOut(tween(slideDurationMs)) },
+                            popExitTransition = {
+                                slideOutHorizontally(tween(slideDurationMs)) { it } + fadeOut(tween(slideDurationMs))
+                            }
+                        ) {
+                            TodoTrashScreen(
+                                trashedTodos = trashedTodos,
+                                onRestore = { todo -> viewModel.restoreTodo(todo.id) },
+                                onDeleteForever = { todo -> viewModel.deleteTodoForever(todo.id) },
+                                onEmptyTrash = { viewModel.emptyTodoTrash() },
                                 onBack = { navController.popBackStack() }
                             )
                         }

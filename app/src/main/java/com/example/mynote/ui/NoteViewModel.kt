@@ -61,6 +61,9 @@ class NoteViewModel(
     val allTodos: StateFlow<List<Todo>> = dao.getAllTodosFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val trashedTodos: StateFlow<List<Todo>> = dao.getTrashedTodosFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // ---- Notes ----
 
     /** Inserts a brand-new note and reports the generated id back to the caller. */
@@ -193,12 +196,29 @@ class NoteViewModel(
 
     fun deleteTodo(id: Long) {
         viewModelScope.launch {
-            dao.deleteTodo(id)
+            dao.moveToTrashTodo(id, System.currentTimeMillis())
         }
     }
 
     fun deleteCompletedTodos() {
-        viewModelScope.launch { dao.deleteCompletedTodos() }
+        viewModelScope.launch {
+            val completedIds = allTodos.value.filter { it.isDone }.map { it.id }
+            if (completedIds.isNotEmpty()) {
+                dao.moveToTrashTodoBatch(completedIds, System.currentTimeMillis())
+            }
+        }
+    }
+
+    fun restoreTodo(id: Long) {
+        viewModelScope.launch { dao.restoreTodo(id) }
+    }
+
+    fun deleteTodoForever(id: Long) {
+        viewModelScope.launch { dao.deleteTodoPermanently(id) }
+    }
+
+    fun emptyTodoTrash() {
+        viewModelScope.launch { dao.emptyTodoTrash() }
     }
 
     // ---- Settings ----

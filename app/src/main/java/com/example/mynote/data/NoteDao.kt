@@ -64,8 +64,11 @@ interface NoteDao {
     @Query("DELETE FROM notes WHERE isDeleted = 1")
     suspend fun emptyTrash()
 
-    @Query("SELECT * FROM todos ORDER BY createdAt DESC")
+    @Query("SELECT * FROM todos WHERE isDeleted = 0 ORDER BY createdAt DESC")
     fun getAllTodosFlow(): Flow<List<Todo>>
+
+    @Query("SELECT * FROM todos WHERE isDeleted = 1 ORDER BY deletedAt DESC")
+    fun getTrashedTodosFlow(): Flow<List<Todo>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTodo(todo: Todo): Long
@@ -73,9 +76,21 @@ interface NoteDao {
     @Update
     suspend fun updateTodo(todo: Todo)
 
-    @Query("DELETE FROM todos WHERE id = :id")
-    suspend fun deleteTodo(id: Long)
+    @Query("UPDATE todos SET isDeleted = 1, deletedAt = :deletedAt WHERE id = :id")
+    suspend fun moveToTrashTodo(id: Long, deletedAt: Long)
 
-    @Query("DELETE FROM todos WHERE isDone = 1")
+    @Query("UPDATE todos SET isDeleted = 1, deletedAt = :deletedAt WHERE id IN (:ids)")
+    suspend fun moveToTrashTodoBatch(ids: List<Long>, deletedAt: Long)
+
+    @Query("UPDATE todos SET isDeleted = 0, deletedAt = NULL WHERE id = :id")
+    suspend fun restoreTodo(id: Long)
+
+    @Query("DELETE FROM todos WHERE id = :id")
+    suspend fun deleteTodoPermanently(id: Long)
+
+    @Query("DELETE FROM todos WHERE isDeleted = 1")
+    suspend fun emptyTodoTrash()
+
+    @Query("DELETE FROM todos WHERE isDone = 1 AND isDeleted = 0")
     suspend fun deleteCompletedTodos()
 }

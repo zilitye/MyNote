@@ -93,6 +93,8 @@ fun TodoListScreen(
     onAddTodo: (title: String, important: Boolean, dueAt: Long?) -> Unit,
     showAddDialog: Boolean,
     onDismissAddDialog: () -> Unit,
+    trashCount: Int,
+    onOpenTrash: () -> Unit,
     onOpenSettings: () -> Unit,
     isMenuVisible: Boolean,
     onToggleMenu: () -> Unit,
@@ -230,11 +232,16 @@ fun TodoListScreen(
                 TodoCategorySheetContent(
                     totalCount = todos.size,
                     importantCount = todos.count { it.isImportant && !it.isDone },
+                    trashCount = trashCount,
                     folders = folders,
                     selectedFilter = filter,
                     onSelectFilter = {
                         filter = it
                         onToggleMenu()
+                    },
+                    onOpenTrash = {
+                        onToggleMenu()
+                        onOpenTrash()
                     }
                 )
             }
@@ -289,9 +296,11 @@ fun TodoListScreen(
 private fun TodoCategorySheetContent(
     totalCount: Int,
     importantCount: Int,
+    trashCount: Int,
     folders: List<String>,
     selectedFilter: TodoFilter,
-    onSelectFilter: (TodoFilter) -> Unit
+    onSelectFilter: (TodoFilter) -> Unit,
+    onOpenTrash: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -310,6 +319,13 @@ private fun TodoCategorySheetContent(
             importantCount,
             selectedFilter == TodoFilter.Important
         ) { onSelectFilter(TodoFilter.Important) }
+        TodoCategoryItem(
+            Icons.Filled.Delete,
+            "Recently Deleted",
+            trashCount,
+            false,
+            onClick = onOpenTrash
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
@@ -419,7 +435,7 @@ private fun TodoItemWithDismiss(
         },
         enableDismissFromStartToEnd = false
     ) {
-        TodoRow(todo = todo, onToggleDone = onToggleDone, onDelete = onDelete, onEdit = onEdit)
+        TodoRow(todo = todo, onToggleDone = onToggleDone, onEdit = onEdit)
     }
 }
 
@@ -427,7 +443,6 @@ private fun TodoItemWithDismiss(
 private fun TodoRow(
     todo: Todo,
     onToggleDone: (Todo) -> Unit,
-    onDelete: (Todo) -> Unit,
     onEdit: (Todo) -> Unit
 ) {
     val isOverdue = !todo.isDone && todo.dueAt != null && todo.dueAt < System.currentTimeMillis()
@@ -451,7 +466,7 @@ private fun TodoRow(
                 indication = null,
                 interactionSource = interactionSource
             ),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -459,7 +474,7 @@ private fun TodoRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp, vertical = 14.dp)
         ) {
             CircularCheckbox(checked = todo.isDone, onCheckedChange = { onToggleDone(todo) })
             Spacer(modifier = Modifier.width(12.dp))
@@ -467,15 +482,18 @@ private fun TodoRow(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (todo.isImportant && !todo.isDone) {
-                        Text(
-                            text = "! ",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyLarge
+                        Icon(
+                            imageVector = Icons.Filled.PriorityHigh,
+                            contentDescription = "Important",
+                            tint = Color(0xFFF44236),
+                            modifier = Modifier.size(20.dp)
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                     }
                     Text(
                         text = todo.title,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Normal,
                         textDecoration = if (todo.isDone) TextDecoration.LineThrough else null,
                         color = if (todo.isDone) {
                             MaterialTheme.colorScheme.onSurfaceVariant
@@ -493,9 +511,6 @@ private fun TodoRow(
                 }
             }
 
-            IconButton(onClick = { onDelete(todo) }) {
-                Icon(Icons.Filled.Close, contentDescription = "Delete to-do")
-            }
         }
     }
 }
@@ -610,8 +625,8 @@ private fun TodoListScreenPreview() {
         TodoListScreen(
             todos = listOf(
                 Todo(id = 1, title = "Buy groceries", isImportant = true, dueAt = System.currentTimeMillis() + 86400000),
-                Todo(id = 2, title = "Call mom", isDone = true),
-                Todo(id = 3, title = "Finish project", dueAt = System.currentTimeMillis() - 3600000)
+                Todo(id = 3, title = "Finish project", isImportant = true, dueAt = System.currentTimeMillis() - 3600000),
+                Todo(id = 2, title = "Call mom", isDone = true)
             ),
             onToggleDone = {},
             onUpdateTodo = {},
@@ -620,6 +635,8 @@ private fun TodoListScreenPreview() {
             onAddTodo = { _, _, _ -> },
             showAddDialog = false,
             onDismissAddDialog = {},
+            trashCount = 2,
+            onOpenTrash = {},
             onOpenSettings = {},
             isMenuVisible = false,
             onToggleMenu = {}

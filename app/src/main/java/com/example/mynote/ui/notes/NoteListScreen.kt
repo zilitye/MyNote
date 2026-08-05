@@ -648,12 +648,12 @@ private fun NoteCard(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)) {
                     Row(verticalAlignment = Alignment.Top) {
                         Text(
                             text = note.title.ifBlank { "Untitled" },
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Normal,
                             maxLines = 1,
                             modifier = Modifier.weight(1f)
                         )

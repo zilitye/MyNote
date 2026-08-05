@@ -17,5 +17,7 @@ data class Todo(
     val isImportant: Boolean = false,
     val dueAt: Long? = null,
     val folder: String? = null,
+    val isDeleted: Boolean = false,
+    val deletedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
