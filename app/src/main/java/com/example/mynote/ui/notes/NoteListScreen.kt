@@ -47,7 +47,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -360,13 +359,14 @@ fun NoteListScreen(
             }
         }
 
-        // Slide-down Category Menu (Behind Header)
+        // Slide-down Category Menu (Behind Header). Offset by the header's actual
+        // measured height (which already includes the status bar inset) so the sheet
+        // starts exactly where the header ends, no matter the device or font scale.
         androidx.compose.animation.AnimatedVisibility(
             visible = isMenuVisible,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = 68.dp),
+                .padding(top = headerHeightDp),
             enter = slideInVertically { -it } + expandVertically(expandFrom = Alignment.Top),
             exit = slideOutVertically { -it } + shrinkVertically(shrinkTowards = Alignment.Top)
         ) {

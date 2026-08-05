@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -212,13 +211,14 @@ fun TodoListScreen(
             }
         }
 
-        // Slide-down Category Menu (Behind Header)
+        // Slide-down Category Menu (Behind Header). Offset by the header's actual
+        // measured height (which already includes the status bar inset) so the sheet
+        // starts exactly where the header ends, no matter the device or font scale.
         androidx.compose.animation.AnimatedVisibility(
             visible = isMenuVisible,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(top = 68.dp),
+                .padding(top = headerHeightDp),
             enter = slideInVertically { -it } + expandVertically(expandFrom = Alignment.Top),
             exit = slideOutVertically { -it } + shrinkVertically(shrinkTowards = Alignment.Top)
         ) {
