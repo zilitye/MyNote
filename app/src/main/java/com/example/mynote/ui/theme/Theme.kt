@@ -37,9 +37,21 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = AppBlue,
+    secondary = TextSecondaryDark,
+    tertiary = Pink80,
+    background = AppBackgroundDark,
+    surface = CardBackgroundDark,
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = TextPrimaryDark,
+    onSurface = TextPrimaryDark,
+    outline = BorderColorDark,
+    surfaceVariant = CardBackgroundDark,
+    surfaceContainer = CardBackgroundDark,
+    surfaceContainerHigh = CardBackgroundDark,
+    surfaceContainerHighest = CardBackgroundDark
 )
 
 private val LightColorScheme = lightColorScheme(

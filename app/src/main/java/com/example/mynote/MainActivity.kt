@@ -66,7 +66,6 @@ import com.example.mynote.ui.notes.NoteEditScreen
 import com.example.mynote.ui.notes.NoteListScreen
 import com.example.mynote.ui.notes.TrashScreen
 import com.example.mynote.ui.settings.SettingsScreen
-import com.example.mynote.ui.theme.AppBackground
 import com.example.mynote.ui.theme.MyNoteTheme
 import com.example.mynote.ui.todos.TodoInputContent
 import com.example.mynote.ui.todos.TodoListScreen
@@ -433,7 +432,7 @@ private fun MyNoteApp(viewModel: NoteViewModel) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                color = AppBackground,
+                color = MaterialTheme.colorScheme.background,
                 tonalElevation = 8.dp
             ) {
                 TodoInputContent(

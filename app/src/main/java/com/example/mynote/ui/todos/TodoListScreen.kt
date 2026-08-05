@@ -73,7 +73,6 @@ import com.example.mynote.data.Todo
 import com.example.mynote.ui.components.CircularCheckbox
 import com.example.mynote.ui.components.CustomHeader
 import com.example.mynote.ui.components.rememberElasticOverscrollEffect
-import com.example.mynote.ui.theme.AppBackground
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.mynote.util.formatDateTime
 
@@ -225,7 +224,7 @@ fun TodoListScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
-                color = AppBackground,
+                color = MaterialTheme.colorScheme.background,
                 tonalElevation = 3.dp
             ) {
                 TodoCategorySheetContent(
@@ -263,7 +262,7 @@ fun TodoListScreen(
             onDimClick = onScrimClick,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .background(AppBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .onGloballyPositioned { headerHeightPx = it.size.height }
         )
     }

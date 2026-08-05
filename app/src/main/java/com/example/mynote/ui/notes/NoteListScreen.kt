@@ -113,7 +113,6 @@ import com.example.mynote.data.ViewMode
 import com.example.mynote.ui.components.CircularCheckbox
 import com.example.mynote.ui.components.CustomHeader
 import com.example.mynote.ui.components.rememberElasticOverscrollEffect
-import com.example.mynote.ui.theme.AppBackground
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.mynote.util.formatDate
 import kotlinx.coroutines.launch
@@ -306,7 +305,7 @@ fun NoteListScreen(
                                 y = (searchBarOffsetHeightPx + overscrollEffect.overscrollOffset.value).roundToInt()
                             )
                         }
-                        .background(AppBackground)
+                        .background(MaterialTheme.colorScheme.background)
                         .padding(horizontal = 24.dp)
                 ) {
                     val interactionSource = remember { MutableInteractionSource() }
@@ -373,7 +372,7 @@ fun NoteListScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp),
-                color = AppBackground,
+                color = MaterialTheme.colorScheme.background,
                 tonalElevation = 3.dp
             ) {
                 CategorySheetContent(
@@ -424,7 +423,7 @@ fun NoteListScreen(
             onDimClick = onScrimClick,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .background(AppBackground)
+                .background(MaterialTheme.colorScheme.background)
                 .onGloballyPositioned { headerHeightPx = it.size.height }
         )
     }

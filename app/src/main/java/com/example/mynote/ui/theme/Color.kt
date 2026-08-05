@@ -16,3 +16,10 @@ val AppBlue = Color(0xFF007BFF)
 val TextPrimary = Color(0xFF000000)
 val TextSecondary = Color(0xFF8E8E93)
 val BorderColor = Color(0xFFE5E5EA)
+
+// Dark theme
+val AppBackgroundDark = Color(0xFF000000)
+val CardBackgroundDark = Color(0xFF212224)
+val TextPrimaryDark = Color(0xFFFFFFFF)
+val TextSecondaryDark = Color(0xFFABABAF)
+val BorderColorDark = Color(0xFF3A3A3C)

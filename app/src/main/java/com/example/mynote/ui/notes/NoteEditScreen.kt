@@ -252,7 +252,7 @@ fun NoteEditScreen(
 
     with(sharedTransitionScope) {
         Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.White,
+            containerColor = MaterialTheme.colorScheme.background,
             modifier = Modifier.sharedElement(
                 rememberSharedContentState(key = "note_${existingNote?.id}"),
                 animatedVisibilityScope = animatedVisibilityScope
@@ -260,8 +260,8 @@ fun NoteEditScreen(
             topBar = {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = androidx.compose.ui.graphics.Color.White,
-                        scrolledContainerColor = androidx.compose.ui.graphics.Color.White
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background
                     ),
                     windowInsets = TopAppBarDefaults.windowInsets,
                     title = {
@@ -407,8 +407,8 @@ fun NoteEditScreen(
                         placeholder = { Text("Start writing…") },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
                         colors = TextFieldDefaults.colors(
-                            unfocusedContainerColor = androidx.compose.ui.graphics.Color.White,
-                            focusedContainerColor = androidx.compose.ui.graphics.Color.White,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.background,
+                            focusedContainerColor = MaterialTheme.colorScheme.background,
                             unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
                             focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
                         )
