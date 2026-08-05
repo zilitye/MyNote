@@ -53,6 +53,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -197,9 +198,15 @@ fun NoteListScreen(
     val searchBarHeightPx = with(density) { searchBarHeight.toPx() }
     var searchBarOffsetHeightPx by remember { mutableStateOf(0f) }
 
-    val nestedScrollConnection = remember(searchBarHeightPx) {
+    val gridState = rememberLazyGridState()
+    val nestedScrollConnection = remember(searchBarHeightPx, gridState) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Only scroll the search bar if the content itself is scrollable
+                if (!gridState.canScrollForward && !gridState.canScrollBackward) {
+                    return Offset.Zero
+                }
+
                 val delta = available.y
                 val newOffset = searchBarOffsetHeightPx + delta
                 searchBarOffsetHeightPx = newOffset.coerceIn(-searchBarHeightPx, 0f)
@@ -221,6 +228,7 @@ fun NoteListScreen(
             ) {
                 val overscrollEffect = rememberElasticOverscrollEffect()
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(if (isGridView) 2 else 1),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
